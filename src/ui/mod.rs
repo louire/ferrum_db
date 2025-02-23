@@ -12,6 +12,7 @@ mod input;
 mod results;
 mod sidebar;
 mod status;
+mod table;
 
 pub use input::InputPanel;
 pub use results::ResultsPanel;

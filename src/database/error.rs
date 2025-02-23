@@ -18,6 +18,10 @@ pub enum DatabaseError {
     /// Error occurred while managing database configuration
     #[error("Database configuration error: {0}")]
     ConfigError(String),
+
+    /// Unknown error occurred
+    #[error("Unknown error: {0}")]
+    Unknown(String),
 }
 
 impl From<sqlx::Error> for DatabaseError {
@@ -28,5 +32,11 @@ impl From<sqlx::Error> for DatabaseError {
             sqlx::Error::Io(io_err) => DatabaseError::ConnectionError(io_err.to_string()),
             _ => DatabaseError::QueryError(err.to_string()),
         }
+    }
+}
+
+impl From<anyhow::Error> for DatabaseError {
+    fn from(err: anyhow::Error) -> Self {
+        DatabaseError::Unknown(err.to_string())
     }
 }

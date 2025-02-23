@@ -6,6 +6,7 @@ use tracing::debug;
 
 mod state;
 pub mod input;
+pub mod query;
 pub use state::AppState;
 pub use input::Mode;
 
@@ -26,34 +27,42 @@ impl App {
         })
     }
 
+    /// Initializes the database connection
+    pub async fn init_database(&mut self, config: crate::database::DatabaseConfig) -> Result<()> {
+        self.state.init_database(config).await
+    }
+
     /// Runs the main application loop
     pub async fn run(&mut self) -> Result<()> {
+        // Initialize terminal
         self.init_terminal()?;
 
+        // Main event loop
         while !self.should_quit {
             self.draw()?;
 
             if let Ok(true) = event::poll(Duration::from_millis(100)) {
                 if let Event::Key(key) = event::read()? {
-                    self.handle_input(key.code, key.modifiers)?;
+                    self.handle_input(key.code, key.modifiers).await?;
                 }
             }
         }
 
+        // Cleanup terminal
         self.cleanup_terminal()?;
         Ok(())
     }
 
     /// Handles keyboard input based on current mode
-    fn handle_input(&mut self, key: KeyCode, modifiers: KeyModifiers) -> Result<()> {
+    async fn handle_input(&mut self, key: KeyCode, modifiers: KeyModifiers) -> Result<()> {
         match self.state.mode() {
-            Mode::Normal => self.handle_normal_mode(key, modifiers),
-            Mode::Insert => self.handle_insert_mode(key, modifiers),
+            Mode::Normal => self.handle_normal_mode(key, modifiers).await,
+            Mode::Insert => self.handle_insert_mode(key, modifiers).await,
         }
     }
 
     /// Handles input in normal mode
-    fn handle_normal_mode(&mut self, key: KeyCode, modifiers: KeyModifiers) -> Result<()> {
+    async fn handle_normal_mode(&mut self, key: KeyCode, modifiers: KeyModifiers) -> Result<()> {
         match (key, modifiers) {
             (KeyCode::Char('q'), _) => {
                 self.should_quit = true;
@@ -64,21 +73,36 @@ impl App {
             (KeyCode::Char('c'), KeyModifiers::CONTROL) => {
                 self.should_quit = true;
             }
+            (KeyCode::Char('r'), _) => {
+                // Clear current results
+                self.state.query_result = None;
+                self.state.set_status("Results cleared".to_string());
+            }
+            (KeyCode::Char('d'), _) => {
+                // Toggle database list (to be implemented)
+                self.state.set_status("Database list toggle (not implemented)".to_string());
+            }
             _ => {}
         }
         Ok(())
     }
 
     /// Handles input in insert mode
-    fn handle_insert_mode(&mut self, key: KeyCode, modifiers: KeyModifiers) -> Result<()> {
+    async fn handle_insert_mode(&mut self, key: KeyCode, modifiers: KeyModifiers) -> Result<()> {
         match (key, modifiers) {
             (KeyCode::Esc, _) => {
                 self.state.input.toggle_mode();
             }
-            (KeyCode::Enter, _) => {
+            (KeyCode::Enter, KeyModifiers::CONTROL) | (KeyCode::Enter, KeyModifiers::ALT) => {
+                // Execute query without leaving insert mode
                 let query = self.state.input.take_buffer();
-                // TODO: Execute query
-                self.state.set_status(format!("Executed query: {}", query));
+                self.state.execute_query(query).await;
+            }
+            (KeyCode::Enter, _) => {
+                // Execute query and return to normal mode
+                let query = self.state.input.take_buffer();
+                self.state.execute_query(query).await;
+                self.state.input.toggle_mode();
             }
             (KeyCode::Char(c), _) => {
                 self.state.input.insert_char(c);
@@ -91,6 +115,25 @@ impl App {
             }
             (KeyCode::Right, _) => {
                 self.state.input.move_cursor_right();
+            }
+            (KeyCode::Delete, _) => {
+                // Delete character under cursor
+                if self.state.input.cursor_position() < self.state.input.buffer().len() {
+                    self.state.input.move_cursor_right();
+                    self.state.input.delete_char();
+                }
+            }
+            (KeyCode::Home, _) | (KeyCode::Char('a'), KeyModifiers::CONTROL) => {
+                // Move cursor to start of line
+                while self.state.input.cursor_position() > 0 {
+                    self.state.input.move_cursor_left();
+                }
+            }
+            (KeyCode::End, _) | (KeyCode::Char('e'), KeyModifiers::CONTROL) => {
+                // Move cursor to end of line
+                while self.state.input.cursor_position() < self.state.input.buffer().len() {
+                    self.state.input.move_cursor_right();
+                }
             }
             _ => {}
         }

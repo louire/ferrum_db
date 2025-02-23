@@ -1,17 +1,22 @@
 use anyhow::Result;
-use sqlx::{postgres::PgPoolOptions, Pool, Postgres, Row, Column}; // Añadido Row aquí
+use sqlx::{postgres::PgPoolOptions, Pool, Postgres, Row, Column};
 use std::time::Duration;
 
 mod error;
-// Removido el import no usado de DatabaseError
+pub use error::DatabaseError;
 
 /// Configuration for database connection
 #[derive(Debug, Clone, Default)]
 pub struct DatabaseConfig {
+    /// Database host
     pub host: String,
+    /// Database port
     pub port: u16,
+    /// Database username
     pub username: String,
+    /// Database password
     pub password: String,
+    /// Database name
     pub database: String,
 }
 
@@ -93,13 +98,12 @@ impl DatabaseManager {
 
 /// Represents the result of a database query
 pub struct QueryResult {
-    // Removido el derive Debug ya que PgRow no lo implementa
     rows: Vec<sqlx::postgres::PgRow>,
 }
 
 impl QueryResult {
     /// Creates a new QueryResult
-    fn new(rows: Vec<sqlx::postgres::PgRow>) -> Self {
+    pub fn new(rows: Vec<sqlx::postgres::PgRow>) -> Self {
         Self { rows }
     }
 
@@ -133,5 +137,17 @@ impl QueryResult {
                     .collect()
             })
             .collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_database_connection() {
+        let config = DatabaseConfig::new();
+        let result = DatabaseManager::new(config).await;
+        assert!(result.is_ok());
     }
 }
