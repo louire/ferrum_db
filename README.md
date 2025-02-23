@@ -1,4 +1,8 @@
-# FerrumDB 🦀
+  # FerrumDB 🦀
+
+<div align="center">
+  <img src="assets/logo.png" alt="Rusty Bot Logo" width="200">
+</div>
 
 A modern terminal-based database client written in Rust. FerrumDB provides an intuitive TUI (Text User Interface) for interacting with your databases.
 
