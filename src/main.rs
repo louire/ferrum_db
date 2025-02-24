@@ -33,6 +33,6 @@ async fn main() -> Result<()> {
     // Run the application
     app.run().await?;
 
-    info!("Shutting down FerrumDB...");
+    info!("Shutting down FerrumDB ...");
     Ok(())
 }
